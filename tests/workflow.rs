@@ -209,7 +209,11 @@ fn theorems() {
 fn submissions() {
     const LEAN: &str = "theorem solution : True := by trivial\n";
     let fixture = Fixture::new();
-    fixture.write("solution.lean", LEAN);
+    let source = fixture.write("source.lean", LEAN);
+    #[cfg(unix)]
+    std::os::unix::fs::symlink(source, fixture.temp.path().join("solution.lean")).unwrap();
+    #[cfg(not(unix))]
+    fs::copy(source, fixture.temp.path().join("solution.lean")).unwrap();
     let receipt = json!({ "submission_id": "sub-123", "status": "PENDING", "message": "queued" });
     let submit = ["verify", "submit", "thm-123", "solution.lean"];
     for kind in ["prove", "disprove"] {

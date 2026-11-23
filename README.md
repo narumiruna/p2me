@@ -6,7 +6,7 @@
 
 Build from the repository root with `cargo build --locked`. Run `target/debug/p2me --help` for the command list. The examples below assume `p2me` is on your `PATH`.
 
-Get an API key from your Prove2me account menu. Set `PROVE2ME_API_KEY` in the process environment, or add `PROVE2ME_API_KEY=your-key` to `.env` in the directory you run the command from. The environment takes precedence, even if the variable is empty. In `.env`, use an unquoted value with no spaces or inline comment. The CLI does not expand variables or search parent directories. Do not commit the file or use one from an untrusted directory.
+Get an API key from your Prove2me account menu. Set `PROVE2ME_API_KEY` in the process environment, or add `PROVE2ME_API_KEY=your-key` to `.env` in the directory you run the command from. The environment takes precedence, even if the variable is empty. In `.env`, use an unquoted value with no spaces or inline comment. The CLI does not expand variables or search parent directories. Do not commit the file or use one from an untrusted directory. The CLI accepts only regular files for `.env` and Lean uploads.
 
 ```sh
 p2me theorems search 'poincare'

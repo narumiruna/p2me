@@ -1,4 +1,4 @@
-use std::{fs::File, path::Path, time::Duration};
+use std::{io::ErrorKind, path::Path, time::Duration};
 
 use reqwest::{
     Url,
@@ -10,6 +10,8 @@ use reqwest::{
     retry,
 };
 use serde_json::{Value, json};
+
+use super::input_file;
 
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(30);
 
@@ -71,22 +73,17 @@ impl Api {
             .ok_or("missing Lean file name")?
             .to_string_lossy()
             .into_owned();
-        if !path
-            .metadata()
-            .map_err(|_| "could not open the Lean file")?
-            .is_file()
-        {
-            return Err("the Lean file must be a regular file");
-        }
-        let file = File::open(path).map_err(|_| "could not open the Lean file")?;
-        let size = file
-            .metadata()
-            .map_err(|_| "could not read the Lean file metadata")?
-            .len();
+        let (file, metadata) = input_file::open(path).map_err(|error| match error.kind() {
+            ErrorKind::InvalidInput => "the Lean file must be a regular file",
+            _ => "could not open the Lean file",
+        })?;
         let mut form = Form::new()
             .text("theorem_id", theorem_id)
             .text("proof_type", proof_type)
-            .part("file", Part::reader_with_length(file, size).file_name(name));
+            .part(
+                "file",
+                Part::reader_with_length(file, metadata.len()).file_name(name),
+            );
         if let Some(explanation) = explanation {
             form = form.text("explanation", explanation);
         }

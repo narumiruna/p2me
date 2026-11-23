@@ -1,5 +1,6 @@
 mod api;
 mod credentials;
+mod input_file;
 
 use std::{
     io::{self, Write},
