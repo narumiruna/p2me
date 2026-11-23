@@ -35,5 +35,5 @@ These are proposed requirements for the first version.
 ## Dependencies and open questions
 
 - The workflow depends on the Prove2me API for [authentication](../../.agents/skills/prove2me/references/setup.md), [theorem discovery](../../.agents/skills/prove2me/references/discover.md), and [proof submission and status](../../.agents/skills/prove2me/references/prove.md). The requirements use the bundled reference documentation; behavior against the live API has not been verified.
-- Command names, JSON fields, exit codes, the API key variable name, and the wait timeout are open. Define and document the public interface before asking agents or scripts to rely on it.
-- The proposed architecture is recorded in the ADRs for [default output](../decisions/0001-default-to-readable-json.md), [submission and verification](../decisions/0002-use-an-explicit-verification-workflow.md), and [credential sources](../decisions/0003-load-api-keys-from-environment-and-dotenv.md).
+- [ADR 0004](../decisions/0004-map-cli-commands-to-api-endpoints.md) defines the core command names, preserves the API response fields, and separates command exit codes from platform verdicts. Optional flags, specific nonzero exit codes, the API key variable name, and the proposed wait syntax and timeout remain open.
+- Related ADRs cover [default output](../decisions/0001-default-to-readable-json.md), [submission and verification](../decisions/0002-use-an-explicit-verification-workflow.md), and [credential sources](../decisions/0003-load-api-keys-from-environment-and-dotenv.md).
