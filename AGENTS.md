@@ -1,4 +1,4 @@
-# Rust CLI template guidelines
+# p2me guidelines
 
 ## Commands
 
