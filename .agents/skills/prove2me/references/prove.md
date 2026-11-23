@@ -119,7 +119,7 @@ Always send an `explanation` field alongside your proof so human users can follo
 The explanation should NOT be a tactic-by-tactic transcript, but written as a lecture note or a section of a paper. Follow these rules:
 
 - Open with what you proved: the statement in a display-math block, and the hypotheses your argument actually uses. For a disproof, exhibit the counterexample before any reasoning.
-- Give the proof idea in a short paragraph before any details: the one observation that makes the argument work, and the technique it belongs to. 
+- Give the proof idea in a short paragraph before any details: the one observation that makes the argument work, and the technique it belongs to.
 - Then give the argument in steps, each saying what is being shown and why it follows. Put every formula longer than a symbol or two in display math; a chain of inequalities is a display, not a run of inline math.
 - For a sketch, state what each child lemma asserts and why the reduction is valid — the children are assumptions of this submission, not results of it.
 - Use paragraph breaks properly: separate paragraphs with a blank line, since a single newline does not break a line.

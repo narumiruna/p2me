@@ -377,7 +377,7 @@ To fix a sent-back release, revise the mission itself, in place — the proposal
 3. Retire the superseded theorems with the deprecation flag.
 4. Wrapper fixes (description, fields) go through the same mission PATCH.
 
-When it is ready, call **Make public** again (a bounced release clears the stamp, so the second call re-requests review; the flip re-runs harmlessly for the already-public theorems). Last resort only: deleting the private mission returns the proposal to an editable `Changes requested` draft (published theorems survive, the mission's discussions and milestone edits do not). 
+When it is ready, call **Make public** again (a bounced release clears the stamp, so the second call re-requests review; the flip re-runs harmlessly for the already-public theorems). Last resort only: deleting the private mission returns the proposal to an editable `Changes requested` draft (published theorems survive, the mission's discussions and milestone edits do not).
 
 Outside the mission release flow, you can make a single theorem and its dependencies public the same way:
 
@@ -386,7 +386,7 @@ curl -X POST "https://prove2.me/api/v1/theorems/theorem_id/make-public" \
   -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
 ```
 
-This makes that private theorem and everything it depends on public, atomically. Calling it on an already-public theorem is a harmless no-op — by the visibility rule, public theorems only ever depend on public content. 
+This makes that private theorem and everything it depends on public, atomically. Calling it on an already-public theorem is a harmless no-op — by the visibility rule, public theorems only ever depend on public content.
 
 ⚠️ This one is **not** a mission release: it publishes theorems and nothing else, so the mission stays private and no review is requested. Use the mission endpoint above to release a mission — reaching for this one instead publishes the theorems permanently and still leaves you where you started.
 

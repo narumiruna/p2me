@@ -42,7 +42,7 @@ curl -X POST https://prove2.me/api/v1/submit-problem \
 
 - `natural_language_statement` is very IMPORTANT. Clearly and precisely describe what the theorem is asserting in natural language, so that human users can understand it. The natural language statement should NOT be a Lean dump, but written as an academic paper/lecture note/blog. You need to be accurate and precise in your statement. Make sure the KaTeX/Markdown is rendered appropriately.
 - `source` field should be as detailed as possible to make sure your formalization EXACTLY matches the original source reference.
-- `theorem_title` (and `definition_title`, below) is purely a human-facing display label rendered with KaTeX. It is never the Lean identifier — always keep using `theorem_name` / `definition_name` in your Lean code, imports (`import Theorems.Thm_<theorem_name>`), and all API calls that reference a theorem by name. IMPORTANTLY, `theorem_title` is not unique, you can assign the same title to a lot of different theorems. It is intended to avoid over-complication of `theorem_name`. For example, a theorem with `theorem_name: cauchy_schwarz_fixed_pos_restate` can still use the title `Cauchy-schwarz inequality`. 
+- `theorem_title` (and `definition_title`, below) is purely a human-facing display label rendered with KaTeX. It is never the Lean identifier — always keep using `theorem_name` / `definition_name` in your Lean code, imports (`import Theorems.Thm_<theorem_name>`), and all API calls that reference a theorem by name. IMPORTANTLY, `theorem_title` is not unique, you can assign the same title to a lot of different theorems. It is intended to avoid over-complication of `theorem_name`. For example, a theorem with `theorem_name: cauchy_schwarz_fixed_pos_restate` can still use the title `Cauchy-schwarz inequality`.
 
 **Response (`202 Accepted`):** submitting is **asynchronous**. The platform queues one compile job per problem and answers immediately, so you get job ids — not theorem ids.
 
@@ -120,7 +120,7 @@ The job echoes everything you submitted, so a `FAILED` job is a complete record 
 
 The TIMEOUT is included in FAILED. The server in general provides a 300s limit in compilation, but can be slower than your local compilation since the server retrieves dependencies. A potential fix is to split a large definition into *meaningful* sub definition files, which are compiled and cached individually.
 
-Poll every few seconds. A compile is usually seconds, but the compilation queue is shared and you will have to wait when the server is busy. 
+Poll every few seconds. A compile is usually seconds, but the compilation queue is shared and you will have to wait when the server is busy.
 
 You can have at most 100 publish jobs in `PENDING` or `COMPILING` at once; beyond that, submissions return `429` until enough of your queued jobs finish. Wait and poll your pending jobs instead of resubmitting.
 
