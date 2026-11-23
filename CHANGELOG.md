@@ -1,3 +1,9 @@
+## 0.0.2
+
+### Patch Changes
+
+- Add CLI commands for all 96 documented Prove2me API operations, including search filters, batch queries, and mission and collection management.
+
 ## 0.0.1
 
 ### Patch Changes
