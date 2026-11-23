@@ -16,9 +16,9 @@ The [Prove2me authentication API](../../.agents/skills/prove2me/references/setup
 
 ## Decision Outcome
 
-Support both sources. Read the named key from the process environment first. Only if it is unset, look for the same key in `.env` in the current working directory. Do not search parent directories. Parse the file as data, not as a shell script. Report a missing or empty key without printing the value. The environment variable name and supported file syntax remain to be documented.
+Support both sources. Read the named key from the process environment first. Only if it is unset, look for the same key in `.env` in the current working directory. Do not search parent directories. Parse the file as data, not as a shell script. Report a missing or empty key without printing the value. The [README](../../README.md#quick-start) documents `PROVE2ME_API_KEY` and the `.env` syntax.
 
-Exchange the key at the official Prove2me API and use the resulting token for authenticated requests. Do not send either credential outside `https://prove2.me/api/v1`, including through redirects. Do not accept account passwords, print credentials, write a `.env` file, or store the token on disk.
+Exchange the key at the official Prove2me API and use the resulting token for authenticated requests. Do not send either credential outside `https://prove2.me/api/v1`, including through redirects. For ordinary authenticated operations, do not accept account passwords or print credentials. Explicit account commands are separate: `auth login` and related endpoints read JSON from a file or standard input, not password or token flags. Token and key commands return the requested credentials as JSON on standard output, never in diagnostics. The CLI does not write a `.env` file or store credentials on disk.
 
 ### Consequences
 
@@ -26,4 +26,4 @@ An agent's explicitly injected key takes precedence over local settings. A user-
 
 ### Confirmation
 
-Test with dummy keys in the environment only, in `.env` only, and in both sources with different values. Confirm that the environment takes precedence, that a file in a parent directory is not used, and that a missing or empty key yields a diagnostic. Verify that output does not expose keys or tokens and that neither is sent to a redirect target outside the API.
+Test with dummy keys in the environment only, in `.env` only, and in both sources with different values. Confirm that the environment takes precedence, that a file in a parent directory is not used, and that a missing or empty key yields a diagnostic. Verify that ordinary command output and all diagnostics do not expose credentials, that explicit authentication commands can pass their JSON results through a pipe, and that credentials are never sent to a redirect target.

@@ -93,6 +93,7 @@ pub fn invoke(mut command: Command, replies: Vec<Reply>) -> (Output, Vec<Request
 
 fn respond(stream: &mut TcpStream, reply: Reply, port: u16) {
     let (status, headers, body) = match reply {
+        Reply::Json(204, _) => (204, String::new(), String::new()),
         Reply::Json(code, body) => (code, String::new(), body.to_string()),
         Reply::InvalidJson => (200, String::new(), "not JSON".into()),
         Reply::Redirect => (
