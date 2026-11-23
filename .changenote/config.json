@@ -9,7 +9,7 @@
     "uv.lock"
   ],
   "packages": {
-    "rust-cli-template": {
+    "p2me": {
       "path": ".",
       "version_file": "Cargo.toml",
       "tag_prefix": "v"
