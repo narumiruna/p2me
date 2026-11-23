@@ -2,7 +2,7 @@
 name = "p2me"
 version = "0.0.0"
 edition = "2024"
-description = ""
+description = "A minimal command-line tool written in Rust."
 readme = "README.md"
 repository = "https://github.com/narumiruna/p2me"
 license = "MIT"

@@ -1,6 +1,6 @@
 [project]
 name = "p2me"
-description = ""
+description = "A minimal command-line tool written in Rust."
 readme = "README.md"
 requires-python = ">=3.10"
 license = "MIT"
