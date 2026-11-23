@@ -24,3 +24,7 @@ jobs:
           cargo fmt --all -- --check
           cargo clippy --locked --all-targets -- -D warnings
           cargo test --locked --all-targets
+      - name: Check CLI against a local server
+        run: |
+          cargo clippy --locked --all-targets --features test-endpoint -- -D warnings
+          cargo test --locked --all-targets --features test-endpoint
