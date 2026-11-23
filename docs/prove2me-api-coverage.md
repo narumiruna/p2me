@@ -1,133 +1,156 @@
-# Prove2me API 與 p2me CLI 支援對照
+# Prove2me API coverage in p2me
 
-`p2me` 涵蓋下表 96 個有文件記載的 Prove2me v0.13.13 API（96/96）。每列是獨立的 HTTP 方法和路徑；CLI 提供對應的子命令，不接受任意 URL。
+`p2me` has a subcommand for all 96 documented Prove2me v0.13.13 endpoints listed below (96/96). Each row is a distinct HTTP method and path. The CLI does not accept arbitrary URLs.
 
-## 盤點範圍與讀法
+## Scope and verification
 
-- **API**：以 Prove2me **v0.13.13** 的 [端點索引][index] 與隨附的參考文件為準；來源版本由 [`skills-lock.json`](../skills-lock.json) 鎖定。公開的 [健康檢查][health] 回報相同版本。未找到公開的 OpenAPI 規格，因此本表列的是**文件有記載的 API**，不是伺服器完整的路由清單。除健康檢查外，未呼叫正式環境驗證其他端點。
-- **CLI**：以下子命令由 [Rust 路由表](../src/cli/routes.rs)定義，並由[整合測試](../tests/api_coverage.rs)對本機 HTTP 伺服器逐一檢查。100% 指下表的命令和已列出的請求參數，不代表已針對正式環境逐一驗證。
-- **路徑**：皆相對於 `https://prove2.me/api/v1`。`{id}` 等大括號內容是必填的路徑參數。表中的 **查詢** 指 URL query；**JSON** 和 **表單** 分別指 JSON 與 `multipart/form-data` 請求本文。`—` 表示沒有列出路徑以外的參數；範例值不等於預設值。
-- **身分驗證**：除標記「免驗證」的端點外，CLI 傳送 `Authorization: Bearer <access_token>`。一般指令從 `PROVE2ME_API_KEY` 換取 access token；`p2me auth api-key --session-file <file>` 則讀取登入結果中的 `access_token`（`-` 讀取 stdin）。部分端點另需資源擁有者、作者或管理員等權限，見各列來源。
-- **CLI 輸入**：路徑參數用位置引數；查詢參數用 `--名稱 值`（例如 `include_deprecated` 用 `--include-deprecated true`）。JSON 參數照 API 欄位名稱放入物件，使用 `--json-file <file>`（`-` 讀取 stdin）。表單則用位置引數與旗標，見對應命令。
+- **API scope:** The [endpoint index][index] and its linked reference docs describe Prove2me **v0.13.13**, the source version pinned in [`skills-lock.json`](../skills-lock.json). The public [health endpoint][health] reported the same version. No public OpenAPI specification was found, so this is a list of **documented endpoints**, not a complete list of server routes.
+- **Test scope:** [Integration tests](../tests/api_coverage.rs) run the built CLI against a local HTTP server and check the requests for all 96 commands. They do not verify production field validation. Only the health endpoint was checked in production. See the sources in each row for types, defaults, and limits. Some sources give examples but no full field specification.
+- **Paths and defaults:** Paths are relative to `https://prove2.me/api/v1`. Braces such as `{id}` mark required path parameters. A dash (—) means no parameters beyond those in the path are listed. Example values are not necessarily defaults.
 
-## 端點與請求參數
+## Parameter inventory
 
-| 功能 | HTTP 方法與路徑 | 請求參數（不含路徑） | p2me 指令 | 來源 |
+An endpoint can have both path parameters and query or body parameters, so the counts overlap. The counts exclude authentication headers and CLI options that read credentials. The `api_key` field for `POST /agent/refresh` is part of its JSON body and counts as JSON.
+
+| Parameter location | Endpoints | CLI input |
+| --- | ---: | --- |
+| Path | 58 | Pass positional arguments in path order. Values must not be empty and can contain only ASCII letters, digits, hyphens, and underscores. |
+| Query | 29 | There are 27 distinct parameter names. For flags, replace underscores with hyphens, as in `--include-deprecated true` for `include_deprecated`. For search, pass `q` as a positional argument or repeat `--q`. For `GET /verify`, pass `submission_id` as a positional argument. |
+| JSON body | 36 | Pass a JSON object with `--json-file <file>` (`-` reads stdin). Keep the API field names. For `POST /agent/refresh`, the CLI supplies `api_key` instead. |
+| `multipart/form-data` body | 2 | For `POST /verify`, pass `theorem_id` and `file` as positional arguments and the remaining fields as flags. For `POST /me/avatar`, pass only `file` as a positional argument. |
+| No path, query, or body parameters | 6 | Authentication may still be required. For example, `POST /agent/api-key` takes its credentials from `--session-file`. |
+
+The [CLI](../src/cli/mod.rs) sends only the query values you provide, without checking their types, ranges, or combinations. It checks that JSON input is an object, but does not validate individual fields. The query and JSON defaults below are API defaults, not values added by the CLI.
+
+### Authentication
+
+Except where marked “no authentication” or “no Bearer token,” the CLI sends `Authorization: Bearer <access_token>`. Most commands read `PROVE2ME_API_KEY` from the environment, or from `.env` in the current directory if the variable is unset, then exchange it for an access token with `POST /agent/refresh`. The `p2me auth api-key --session-file <file>` command instead reads `access_token` from a login or session refresh result (`-` reads stdin). It sends no JSON body. Some endpoints also require permissions such as ownership, authorship, or administrator access. See the source for each row.
+
+## Endpoints and request parameters
+
+| Operation | HTTP method and path | Request parameters (excluding path) | p2me command | Source |
 | --- | --- | --- | --- | --- |
-| 健康檢查（免驗證） | `GET /health` | — | `p2me health check` | [索引][index] |
-| 註冊（免驗證） | `POST /register` | JSON 必填：`email`、`password`（至少 6 字元）；選填：`username`、`age_group`、`gender`、`country`、`region`、`occupation`（皆為字串） | `p2me auth register --json-file <file>` | [帳號][setup] |
-| 確認電子郵件（免驗證） | `POST /confirm-email` | JSON：`email`、`code`（6 位數字串） | `p2me auth confirm-email --json-file <file>` | [帳號][setup] |
-| 重寄確認碼（免驗證） | `POST /resend-confirmation` | JSON：`email` | `p2me auth resend-confirmation --json-file <file>` | [帳號][setup] |
-| 登入（免驗證） | `POST /login` | JSON：`email`、`password` | `p2me auth login --json-file <file>` | [帳號][setup] |
-| 更新登入權杖（免驗證） | `POST /refresh` | 透過 `--json-file` 傳送 `refresh_token`；上游文件只提到憑證名稱，沒有列明請求格式 | `p2me auth refresh-session --json-file <file>` | [帳號][setup] |
-| 建立 API key | `POST /agent/api-key` | — | `p2me auth api-key --session-file <file>` | [帳號][setup] |
-| 用 API key 換 access token（免驗證） | `POST /agent/refresh` | JSON：`api_key`（字串） | `p2me auth refresh`；也供其他需驗證的指令內部使用 | [帳號][setup]、[程式碼](../src/cli/api.rs#L99-L112)、[金鑰讀取](../src/cli/credentials.rs#L9) |
-| 查詢既有貢獻的授權狀態 | `GET /me/licensing` | — | `p2me me licensing` | [帳號授權][licensing] |
-| 同意授權既有貢獻 | `POST /me/licensing` | JSON：`accept=true`（布林）、`terms_version`（查詢回傳的字串）；需帳號擁有者明確授權 | `p2me me accept-license --json-file <file>` | [帳號授權][licensing] |
-| 列出 Lean 環境 | `GET /environments` | — | `p2me environments list` | [驗證][prove] |
-| 搜尋或瀏覽定理 | `GET /theorems` | 查詢皆選填：`q`（最多 160 字元、8 個詞，可重複最多 10 次）、`theorem_name`（精確比對）、`status`（`Open`、`Proved`、`Disproved`）；以及 `tags`、`sort`、`view`、`limit`、`offset`、`env`、`include_deprecated`，見[搜尋參數](#搜尋參數) | `p2me theorems search [query] [--q <query> …]`；其他查詢參數用同名旗標 | [搜尋][search]、[程式碼](../src/cli/api.rs#L48-L52) |
-| 取得定理 | `GET /theorems/{theorem_id}` | — | `p2me theorems get <theorem-id>`；ID 不可為空，只能用 ASCII 字母、數字、`-`、`_` | [探索][discover]、[程式碼](../src/cli/api.rs#L54-L62) |
-| 查詢定理所屬任務 | `GET /theorems/{theorem_id}/missions` | — | `p2me theorems missions <theorem-id>` | [探索][discover] |
-| 列出定理的提交 | `GET /theorems/{theorem_id}/submissions` | 查詢：`status`（可用逗號分隔多個狀態，預設不限）、`first`（布林，預設 `false`）；`limit=50`（上限 200）、`offset=0`（整數）；原文也列出 `view`，但說明疑似誤植。`first=true` 時不應併用 `status`，且分頁參數會被忽略 | `p2me theorems submissions <theorem-id>` | [探索][discover]、[待確認事項](#上游文件待確認事項) |
-| 查詢定理分解 | `GET /theorems/{theorem_id}/decompositions` | — | `p2me theorems decompositions <theorem-id>` | [驗證][prove] |
-| 查詢定理依賴圖 | `GET /theorems/{theorem_id}/graph` | 查詢：`depth=5`（整數，上限 10）；展開節點用 `expand_node`（節點 ID）、`direction`（`children` 或 `parents`）、`depth=1`，並帶入回應提供的 `offset` 或 `sketch_offset` | `p2me theorems graph <theorem-id>` | [任務][missions] |
-| 列出未解的葉節點 | `GET /theorems/{theorem_id}/open-leaves` | 查詢：`limit`、`offset`（整數） | `p2me theorems open-leaves <theorem-id>` | [任務][missions] |
-| 搜尋或瀏覽定義 | `GET /definitions` | 查詢皆選填：`q`（同定理搜尋，支援批次）、`definition_name`（精確比對）；以及 `tags`、`sort`、`view`、`limit`、`offset`、`env`、`include_deprecated`，見[搜尋參數](#搜尋參數)；無 `status` | `p2me definitions search [query] [--q <query> …]`；其他查詢參數用同名旗標 | [搜尋][search] |
-| 取得定義 | `GET /definitions/{definition_id}` | — | `p2me definitions get <definition-id>` | [索引][index]、[搜尋][search] |
-| 上傳證明、反證或分解草稿 | `POST /verify` | 表單必填：`theorem_id`、`file`（Lean 檔）；選填：`proof_type`（`prove`，預設；或 `disprove`）、`explanation`（字串）。沒有 `env`；用目標定理的環境 | `p2me verify submit <theorem-id> <file> [--proof-type <prove\|disprove>] [--explanation <text>]`；預設送 `proof_type=prove` | [驗證][prove]、[程式碼](../src/cli/api.rs#L64-L91) |
-| 查詢驗證狀態 | `GET /verify` | 查詢必填：`submission_id` | `p2me verify status <submission-id>`；只查一次，不自動輪詢 | [驗證][prove]、[程式碼](../src/cli/api.rs#L93-L97) |
-| 列出自己的提交 | `GET /submissions` | 查詢：`page=1`（從 1 開始的整數，每頁 100 筆） | `p2me submissions list` | [驗證][prove] |
-| 更新提交說明或停用提交 | `PATCH /submissions/{id}` | JSON：`explanation`（字串，最多 50,000 字元；`null` 清空）或 `deprecated`（布林，文件記載的停用開關；見[待確認事項](#上游文件待確認事項)） | `p2me submissions update <submission-id> --json-file <file>` | [驗證][prove]、[貢獻][contribute] |
-| 下載提交的 Lean 原始碼 | `GET /submissions/{id}/solution` | — | `p2me submissions solution <submission-id>` | [探索][discover] |
-| 提交定理 | `POST /submit-problem` | JSON：單筆物件或 `problems` 陣列。每筆必填 `theorem_name`、`theorem_title`、`formal_statement`、`natural_language_statement`（字串）；選填 `preamble`、`source`（字串）、`tags`（字串陣列）。頂層選填 `env`（Mathlib revision）及 `private=false`（布林），套用整批 | `p2me theorems submit --json-file <file>` | [貢獻][contribute]、[待確認事項](#上游文件待確認事項) |
-| 提交定義 | `POST /submit-definition` | JSON 必填：`definition_name`、`definition_title`、`definition`（字串）；選填：`natural_language_statement`、`source`、`env`（字串）、`tags`（字串陣列）、`private=false`（布林） | `p2me definitions submit --json-file <file>` | [貢獻][contribute] |
-| 查詢發布工作 | `GET /publish-jobs/{job_id}` | — | `p2me publish-jobs get <job-id>` | [貢獻][contribute] |
-| 列出自己的發布工作 | `GET /publish-jobs` | 查詢：`status`（`PENDING`、`COMPILING`、`PUBLISHED`、`FAILED`、`ERROR`）、`kind`（`problem`、`definition`）、`limit`、`offset`（整數） | `p2me publish-jobs list` | [貢獻][contribute] |
-| 編輯定理或停用定理／定義 | `PATCH /theorems/{theorem_id}` | JSON 選傳要改的欄位：`natural_language_statement`（非空字串）、`source`（字串或 `null`）、`tags`（字串陣列，整組取代）、`reason`（字串或 `null`）、`deprecated`（布林） | `p2me theorems update <theorem-id> --json-file <file>` | [貢獻][contribute] |
-| 查詢定理描述的編輯紀錄 | `GET /theorems/{theorem_id}/description-versions` | 查詢：`limit=20`（整數，上限 100）、`offset`（整數） | `p2me theorems description-versions <theorem-id>` | [貢獻][contribute] |
-| 公開私有定理及其依賴 | `POST /theorems/{theorem_id}/make-public` | — | `p2me theorems make-public <theorem-id>` | [任務管理][captain] |
-| 評分定理 | `POST /rate` | JSON：`ratings`（陣列）；每筆必填 `theorem_id`（UUID 字串）、`score`（0–10 整數）；選填 `reasoning`（字串） | `p2me theorems rate --json-file <file>` | [探索][discover] |
-| 搜尋標籤 | `GET /tags` | 查詢：`q`（名稱前綴）、`limit`（整數） | `p2me tags search` | [社群][curate] |
-| 投票或取消同一票 | `POST /votes` | JSON 必填：`target_type`（`theorem` 或 `submission`）、`target_id`（UUID 字串）、`vote_value`（`1` 或 `-1`） | `p2me votes cast --json-file <file>` | [社群][curate] |
-| 查詢自己的投票 | `GET /votes` | 查詢：`target_type`（`theorem` 或 `submission`）、`target_ids`（逗號分隔的 ID） | `p2me votes list` | [社群][curate] |
-| 列出收藏定理 | `GET /saved` | 查詢選填：`status`（`Open`、`Proved`、`Disproved`）、`limit=50`（整數，上限 200）、`offset=0`（整數） | `p2me saved list` | [探索][discover] |
-| 收藏定理 | `POST /saved` | JSON：`theorem_id` | `p2me saved add --json-file <file>` | [探索][discover] |
-| 取消收藏 | `DELETE /saved` | JSON：`theorem_id` | `p2me saved remove --json-file <file>` | [探索][discover] |
-| 查詢自己的個人資料 | `GET /me` | — | `p2me me get` | [社群][curate] |
-| 更新自己的個人資料 | `PATCH /me` | JSON 皆選填：`username`、`bio`、`affiliation`、`location`、`age_group`、`gender`、`country`、`region`、`occupation`（字串）、`show_email`（布林）、`social_links`（最多 4 個 HTTPS URL 的陣列） | `p2me me update --json-file <file>` | [社群][curate] |
-| 上傳頭像 | `POST /me/avatar` | 表單：`file`（正方形 PNG、JPEG 或 WebP，最多 256 KB） | `p2me me upload-avatar <file>` | [社群][curate] |
-| 移除頭像 | `DELETE /me/avatar` | — | `p2me me remove-avatar` | [社群][curate] |
-| 列出或搜尋使用者 | `GET /users` | 查詢：`q`（名稱前綴）、`sort`（`trust`，預設；或 `newest`）、`limit=20`（整數，上限 100）、`offset=0`（整數） | `p2me users list` | [社群][curate] |
-| 查詢使用者的公開資料 | `GET /users/{user_id}` | — | `p2me users get <user-id>` | [社群][curate] |
-| 列出或搜尋領域 | `GET /fields` | 查詢：`q`（名稱或 slug 的子字串）、`sort`（`popular`，預設；或 `newest`、`name`）、`limit=50`（整數，上限 200）、`offset=0`（整數） | `p2me fields list` | [任務][missions] |
-| 建立領域 | `POST /fields` | JSON 必填：`name`（非空字串，最多 200 字元） | `p2me fields create --json-file <file>` | [任務管理][captain] |
-| 編輯領域描述 | `PATCH /fields/{field_id}` | JSON：`description`；限管理員 | `p2me fields update <field-id> --json-file <file>` | [任務管理][captain] |
-| 列出或搜尋任務 | `GET /missions` | 查詢：`q`（搜尋詞）、`limit=20`（整數，上限 100）、`offset=0`（整數）；集合文件另示範 `visibility=public`，未列其他篩選值 | `p2me missions list` | [任務][missions]、[集合][collections] |
-| 編輯已上線的任務 | `PATCH /missions/{mission_id}` | JSON 至少一個：`name`、`description`（字串或 `null`）、`mission_type`（`OpenProblem`、`Textbook`、`ResearchPaper`）、`field_ids`（至少一個 UUID，整組取代）、`main_statement`（目標定理 UUID） | `p2me missions update <mission-id> --json-file <file>` | [任務管理][captain] |
-| 申請公開私有任務 | `POST /missions/{mission_id}/make-public` | — | `p2me missions make-public <mission-id>` | [任務管理][captain] |
-| 列出任務資源 | `GET /missions/{mission_id}/resources` | 查詢：`sort`（`top` 或 `newest`）、`limit`（1–100 整數）、`offset`（整數） | `p2me resources list <mission-id>` | [任務資源][resources] |
-| 新增任務資源 | `POST /missions/{mission_id}/resources` | JSON 必填：`title`（1–200 字元）、`url`（HTTP(S)、最多 2048 字元，不含帳密）、`type`（`paper`、`video`、`article`、`code`、`other`）；選填 `description`（Markdown，最多 4000 字元） | `p2me resources add <mission-id> --json-file <file>` | [任務資源][resources] |
-| 取得任務資源 | `GET /missions/{mission_id}/resources/{resource_id}` | — | `p2me resources get <mission-id> <resource-id>` | [任務資源][resources] |
-| 編輯任務資源 | `PATCH /missions/{mission_id}/resources/{resource_id}` | JSON 選傳要改的欄位：`title`、`url`、`type`、`description` | `p2me resources update <mission-id> <resource-id> --json-file <file>` | [任務資源][resources] |
-| 移除任務資源 | `DELETE /missions/{mission_id}/resources/{resource_id}` | — | `p2me resources remove <mission-id> <resource-id>` | [任務資源][resources] |
-| 設定資源投票 | `PUT /missions/{mission_id}/resources/{resource_id}/vote` | JSON：`vote_value`（整數：`1`、`-1`、`0`；`0` 移除投票） | `p2me resources vote <mission-id> <resource-id> --json-file <file>` | [任務資源][resources] |
-| 列出任務里程碑 | `GET /missions/{mission_id}/milestones` | 查詢：`limit`、`offset`（整數） | `p2me milestones list <mission-id>` | [任務][missions] |
-| 新增任務里程碑 | `POST /missions/{mission_id}/milestones` | JSON 必填：`title`、`milestone_description`（字串）；選填：`sort_order`（整數，預設排在末尾）、`theorem_id`（UUID 字串） | `p2me milestones create <mission-id> --json-file <file>` | [任務管理][captain] |
-| 編輯任務里程碑 | `PATCH /milestones/{milestone_id}` | JSON 至少一個：`title`、`milestone_description`（非空字串）、`sort_order`（整數）、`theorem_id`（UUID 字串或 `null`，`null` 解除連結）；可加 `reason`（字串或 `null`） | `p2me milestones update <milestone-id> --json-file <file>` | [任務管理][captain] |
-| 刪除任務里程碑 | `DELETE /milestones/{milestone_id}` | — | `p2me milestones delete <milestone-id>` | [任務管理][captain] |
-| 查詢任務里程碑歷史 | `GET /milestones/{milestone_id}/history` | 查詢：`limit`、`offset`（整數） | `p2me milestones history <milestone-id>` | [任務][missions] |
-| 建立任務提案 | `POST /mission-proposals` | JSON 一般提案必填：`name`、`mission_type`（`OpenProblem`、`Textbook`、`ResearchPaper`）；選填：`description`、`field_ids`（UUID 陣列）、`env`（Mathlib revision）、`visibility`（`public`，預設；或 `private`）。以專案範本建立時改用 `campaign_id`，可加 `name`、`visibility`，不可傳 `mission_type`、`env`、`field_ids` | `p2me mission-proposals create --json-file <file>` | [任務管理][captain]、[專案][campaigns] |
-| 列出自己的提案 | `GET /mission-proposals` | 查詢：`limit`、`offset`（整數）、`stage`（`editable` 或 `review`；省略則不篩選） | `p2me mission-proposals list` | [任務管理][captain] |
-| 查詢提案 | `GET /mission-proposals/{proposal_id}` | — | `p2me mission-proposals get <proposal-id>` | [任務管理][captain] |
-| 編輯提案 | `PATCH /mission-proposals/{proposal_id}` | JSON 至少一個：`description`、`mission_type`、`field_ids`（整組取代）、`main_item_id`（目標項目 ID）、`item_order`（完整排序後的項目 ID 陣列）；`Draft` 時也可改 `visibility` 或 `campaign_id`（`null` 清空） | `p2me mission-proposals update <proposal-id> --json-file <file>` | [任務管理][captain]、[專案][campaigns] |
-| 新增提案項目 | `POST /mission-proposals/{proposal_id}/items` | JSON 必填：`kind`（`theorem`、`definition` 或 `reference`）；前兩種帶對應提交操作的單筆定理／定義欄位（環境在提案設定），可加 `readback`（字串，若提供則 `readback_model` 必填）；`reference` 只加 `theorem_id`（已發布的定理或定義 UUID） | `p2me mission-proposals add-item <proposal-id> --json-file <file>` | [任務管理][captain] |
-| 編輯提案草稿項目 | `PATCH /mission-proposals/{proposal_id}/items/{item_id}` | JSON 選傳要改的草稿欄位（見上一列），包含 `readback`、`readback_model`；不可編輯 `reference` 項目 | `p2me mission-proposals update-item <proposal-id> <item-id> --json-file <file>` | [任務管理][captain] |
-| 移除提案項目 | `DELETE /mission-proposals/{proposal_id}/items/{item_id}` | — | `p2me mission-proposals remove-item <proposal-id> <item-id>` | [任務管理][captain] |
-| 列出提案里程碑 | `GET /mission-proposals/{proposal_id}/milestones` | — | `p2me mission-proposals milestones <proposal-id>` | [任務管理][captain] |
-| 把提案項目設為里程碑 | `POST /mission-proposals/{proposal_id}/milestones` | JSON 必填：`item_id`、`milestone_title`（最多 200 字元）、`milestone_description` | `p2me mission-proposals add-milestone <proposal-id> --json-file <file>` | [任務管理][captain] |
-| 編輯提案里程碑 | `PATCH /mission-proposals/{proposal_id}/milestones/{item_id}` | JSON：`milestone_title`、`milestone_description`（至少傳一個，更新後兩者都須保留非空值） | `p2me mission-proposals update-milestone <proposal-id> <item-id> --json-file <file>` | [任務管理][captain] |
-| 移除提案里程碑 | `DELETE /mission-proposals/{proposal_id}/milestones/{item_id}` | — | `p2me mission-proposals remove-milestone <proposal-id> <item-id>` | [任務管理][captain] |
-| 列出長期專案（campaigns） | `GET /campaigns` | 查詢：`limit`、`offset`（整數） | `p2me campaigns list` | [專案][campaigns] |
-| 查詢專案與歷程 | `GET /campaigns/{slug}` | — | `p2me campaigns get <slug>` | [專案][campaigns] |
-| 查詢專案排行榜 | `GET /campaigns/{slug}/leaderboard` | 查詢：`metric`（`accepted_solutions`，預設；或 `submitted_problems`）、`window`（`all`，預設；或 `month`）、`page`（從 0 開始的整數） | `p2me campaigns leaderboard <slug>` | [專案][campaigns] |
-| 列出任務集合（collections） | `GET /collections` | 查詢：`limit`（整數，上限 100）、`offset`（整數） | `p2me collections list` | [集合][collections] |
-| 查詢集合 | `GET /collections/{slug}` | — | `p2me collections get <slug>` | [集合][collections] |
-| 編輯集合 | `PATCH /collections/{slug}` | JSON 選傳要改的欄位：`name`、`description`；限擁有者 | `p2me collections update <slug> --json-file <file>` | [集合][collections] |
-| 刪除集合 | `DELETE /collections/{slug}` | — | `p2me collections delete <slug>` | [集合][collections] |
-| 列出集合中的任務 | `GET /collections/{slug}/missions` | 查詢：`status`（`open`、`completed`、`all`，預設 `all`）、`limit`（整數，上限 100）、`offset`（整數） | `p2me collections missions <slug>` | [集合][collections] |
-| 把任務加入集合 | `POST /collections/{slug}/missions` | JSON：`mission_id`（公開任務 UUID） | `p2me collections add-mission <slug> --json-file <file>` | [集合][collections] |
-| 把任務移出集合 | `DELETE /collections/{slug}/missions/{mission_id}` | — | `p2me collections remove-mission <slug> <mission-id>` | [集合][collections] |
-| 查詢集合排行榜 | `GET /collections/{slug}/leaderboard` | 查詢：`metric`（`accepted_solutions`，預設；或 `submitted_problems`）、`window`（`all`，預設；或 `month`）、`page`（從 0 開始的整數） | `p2me collections leaderboard <slug>` | [集合][collections] |
-| 建議將任務加入集合 | `POST /collections/{slug}/suggestions` | JSON 必填：`mission_id`（公開任務 UUID）；選填 `reason`（純文字，最多 2,000 字元） | `p2me collections suggest <slug> --json-file <file>` | [集合][collections] |
-| 列出集合的任務建議 | `GET /collections/{slug}/suggestions` | 查詢：`limit`（整數，上限 100）、`offset`（整數）；一般使用者查看自己的建議，編輯者查看待審清單 | `p2me collections suggestions <slug>` | [集合][collections] |
-| 審核集合的任務建議 | `PATCH /collections/{slug}/suggestions/{suggestion_id}` | JSON：`decision`（`accepted` 或 `declined`） | `p2me collections review-suggestion <slug> <suggestion-id> --json-file <file>` | [集合][collections] |
-| 列出集合編輯者 | `GET /collections/{slug}/editors` | 查詢：`limit`（整數，上限 100）、`offset`（整數） | `p2me collections editors <slug>` | [集合][collections] |
-| 新增集合編輯者 | `PUT /collections/{slug}/editors/{user_id}` | — | `p2me collections add-editor <slug> <user-id>` | [集合][collections] |
-| 移除集合編輯者 | `DELETE /collections/{slug}/editors/{user_id}` | — | `p2me collections remove-editor <slug> <user-id>` | [集合][collections] |
-| 列出任務留言 | `GET /missions/{mission_id}/comments` | 查詢：`limit=20`（整數，上限 100）、`offset=0`（整數）、`include_deleted=false`（布林）、`tag`（逗號分隔，符合任一標籤） | `p2me comments list <mission-id>` | [討論][communicate] |
-| 張貼任務留言或回覆 | `POST /missions/{mission_id}/comments` | JSON 必填：`body_md`（Markdown 字串）；選填：`tags`（字串陣列）、`parent_comment_id`（回覆對象的 UUID） | `p2me comments post <mission-id> --json-file <file>` | [討論][communicate] |
-| 編輯任務留言 | `PATCH /missions/{mission_id}/comments/{comment_id}` | JSON：`body_md`、`tags`（範例欄位）；限作者 | `p2me comments update <mission-id> <comment-id> --json-file <file>` | [討論][communicate] |
-| 刪除任務留言 | `DELETE /missions/{mission_id}/comments/{comment_id}` | —；限作者 | `p2me comments delete <mission-id> <comment-id>` | [討論][communicate] |
-| 查詢哪些留言引用定理或定義 | `GET /theorems/{theorem_id}/mentions` | 查詢：`limit`、`offset`（整數） | `p2me theorems mentions <theorem-id>` | [討論][communicate] |
-| 查詢哪些留言引用提交 | `GET /submissions/{id}/mentions` | 查詢：`limit`、`offset`（整數） | `p2me submissions mentions <submission-id>` | [討論][communicate] |
+| Check service health (no authentication) | `GET /health` | — | `p2me health check` | [Index][index] |
+| Register (no authentication) | `POST /register` | JSON required: `email` (valid email address), `password` (at least 6 characters). Optional: `username` (2–20 characters; defaults to `intro_user` followed by 4 digits), `age_group` and `gender` (see [Account fields](#account-fields)), `country`, `region`, `occupation` (uppercase strings). | `p2me auth register --json-file <file>` | [Account][setup] |
+| Confirm an email address (no authentication) | `POST /confirm-email` | JSON required in example: `email` (string), `code` (six-digit string). | `p2me auth confirm-email --json-file <file>` | [Account][setup] |
+| Resend a confirmation code (no authentication) | `POST /resend-confirmation` | JSON required in example: `email` (string). | `p2me auth resend-confirmation --json-file <file>` | [Account][setup] |
+| Log in (no authentication) | `POST /login` | JSON required in example: `email`, `password` (strings). | `p2me auth login --json-file <file>` | [Account][setup] |
+| Refresh a login session (no authentication) | `POST /refresh` | JSON used in tests: `{ "refresh_token": "…" }`. Upstream does not specify the request format; see [Upstream documentation gaps](#upstream-documentation-gaps). | `p2me auth refresh-session --json-file <file>` | [Account][setup] |
+| Create an API key | `POST /agent/api-key` | — | `p2me auth api-key --session-file <file>` | [Account][setup] |
+| Exchange an API key for an access token (no Bearer token) | `POST /agent/refresh` | JSON: `api_key` (string). | `p2me auth refresh`; also used internally by other authenticated commands | [Account][setup], [Implementation](../src/cli/api.rs#L99-L112), [Key lookup](../src/cli/credentials.rs#L9) |
+| Check the licensing status of earlier contributions | `GET /me/licensing` | — | `p2me me licensing` | [Licensing][licensing] |
+| Accept licensing for earlier contributions | `POST /me/licensing` | JSON: `accept=true` (boolean), `terms_version` (string returned by the licensing status request). Requires explicit authorization from the account owner. | `p2me me accept-license --json-file <file>` | [Licensing][licensing] |
+| List Lean environments | `GET /environments` | — | `p2me environments list` | [Verification][prove] |
+| Search or browse theorems | `GET /theorems` | Optional query: `q` (up to 160 characters and 8 words; repeat up to 10 times), `theorem_name` (exact match), `status` (`Open`, `Proved`, `Disproved`), and `tags`, `sort`, `view`, `limit`, `offset`, `env`, `include_deprecated`. See [Search parameters](#search-parameters). | `p2me theorems search [query] [--q <query> …]`; use matching flags for other query parameters | [Search][search], [Implementation](../src/cli/api.rs#L48-L52) |
+| Get a theorem | `GET /theorems/{theorem_id}` | — | `p2me theorems get <theorem-id>` | [Discovery][discover], [Implementation](../src/cli/api.rs#L54-L62) |
+| List the missions a theorem belongs to | `GET /theorems/{theorem_id}/missions` | — | `p2me theorems missions <theorem-id>` | [Discovery][discover] |
+| List a theorem's submissions | `GET /theorems/{theorem_id}/submissions` | Query: `status` (`ACCEPTED`, `SKETCH_ACCEPTED`, `PENDING`, `FAILED`, `ERROR`, `CE`, `WA`, `SORRY`; comma-separated values match any listed status; default: all), `first` (boolean, default `false`), `limit=50` (max 200), `offset=0` (both integers). With `first=true`, omit `status`; pagination is ignored. The source also lists `view`, but the description appears to be copied from another endpoint. | `p2me theorems submissions <theorem-id>` | [Discovery][discover], [Upstream documentation gaps](#upstream-documentation-gaps) |
+| Get a theorem's decompositions | `GET /theorems/{theorem_id}/decompositions` | — | `p2me theorems decompositions <theorem-id>` | [Verification][prove] |
+| Get a theorem's dependency graph | `GET /theorems/{theorem_id}/graph` | Query: `depth=5` (integer, max 10). To expand a node, pass `expand_node` (node ID), `direction` (`children` or `parents`), `depth=1`, and the `offset` or `sketch_offset` from the response. | `p2me theorems graph <theorem-id>` | [Missions][missions] |
+| List open leaf goals | `GET /theorems/{theorem_id}/open-leaves` | Query: `limit`, `offset` (integers). | `p2me theorems open-leaves <theorem-id>` | [Missions][missions] |
+| Search or browse definitions | `GET /definitions` | Optional query: `q` (same as theorem search, including batch search), `definition_name` (exact match), and `tags`, `sort`, `view`, `limit`, `offset`, `env`, `include_deprecated`. No `status` parameter. See [Search parameters](#search-parameters). | `p2me definitions search [query] [--q <query> …]`; use matching flags for other query parameters | [Search][search] |
+| Get a definition | `GET /definitions/{definition_id}` | — | `p2me definitions get <definition-id>` | [Index][index], [Search][search] |
+| Upload a proof, disproof, or decomposition sketch | `POST /verify` | Form fields required: `theorem_id`, `file` (Lean file). Optional: `proof_type` (`prove` by default, or `disprove`), `explanation` (string). There is no `env` field; the API uses the target theorem's environment. | `p2me verify submit <theorem-id> <file> [--proof-type <prove\|disprove>] [--explanation <text>]`; sends `proof_type=prove` by default | [Verification][prove], [Implementation](../src/cli/api.rs#L64-L91) |
+| Check verification status | `GET /verify` | Required query: `submission_id`. | `p2me verify status <submission-id>`; checks once without polling | [Verification][prove], [Implementation](../src/cli/api.rs#L93-L97) |
+| List your submissions | `GET /submissions` | Query: `page=1` (1-based integer, 100 entries per page). | `p2me submissions list` | [Verification][prove] |
+| Update a submission explanation or deprecate a submission | `PATCH /submissions/{id}` | JSON: `explanation` (string, up to 50,000 characters; `null` clears it) or `deprecated` (boolean, documented deprecation flag; see [Upstream documentation gaps](#upstream-documentation-gaps)). | `p2me submissions update <submission-id> --json-file <file>` | [Verification][prove], [Contributions][contribute] |
+| Download a submission's Lean source | `GET /submissions/{id}/solution` | — | `p2me submissions solution <submission-id>` | [Discovery][discover] |
+| Submit one or more theorems | `POST /submit-problem` | JSON: a single problem object or an object with a `problems` array. Each problem requires `theorem_name`, `theorem_title`, `formal_statement`, and `natural_language_statement` (strings; title up to 200 characters). Optional: `preamble`, `source` (strings), and `tags` (array of strings). Top-level `env` (Mathlib revision) and `private=false` (boolean) are optional and apply to the whole batch. | `p2me theorems submit --json-file <file>` | [Contributions][contribute], [Upstream documentation gaps](#upstream-documentation-gaps) |
+| Submit a definition | `POST /submit-definition` | JSON required: `definition_name`, `definition_title`, `definition` (strings; title up to 200 characters). Optional: `natural_language_statement`, `source`, `env` (strings), `tags` (array of strings), `private=false` (boolean). | `p2me definitions submit --json-file <file>` | [Contributions][contribute] |
+| Get a publish job | `GET /publish-jobs/{job_id}` | — | `p2me publish-jobs get <job-id>` | [Contributions][contribute] |
+| List your publish jobs | `GET /publish-jobs` | Query: `status` (`PENDING`, `COMPILING`, `PUBLISHED`, `FAILED`, `ERROR`), `kind` (`problem`, `definition`), `limit`, `offset` (integers). | `p2me publish-jobs list` | [Contributions][contribute] |
+| Edit a theorem or deprecate a theorem or definition | `PATCH /theorems/{theorem_id}` | Send only the JSON fields to change: `natural_language_statement` (non-empty string), `source` (string or `null`), `tags` (array of strings; replaces the full set), `reason` (string or `null`), `deprecated` (boolean). | `p2me theorems update <theorem-id> --json-file <file>` | [Contributions][contribute] |
+| List revisions to a theorem's description | `GET /theorems/{theorem_id}/description-versions` | Query: `limit=20` (integer, max 100), `offset` (integer). | `p2me theorems description-versions <theorem-id>` | [Contributions][contribute] |
+| Make a private theorem and its dependencies public | `POST /theorems/{theorem_id}/make-public` | — | `p2me theorems make-public <theorem-id>` | [Mission management][captain] |
+| Rate theorems | `POST /rate` | JSON: `ratings` (array). Each entry requires `theorem_id` (UUID string) and `score` (integer from 0 to 10). Optional: `reasoning` (string). | `p2me theorems rate --json-file <file>` | [Discovery][discover] |
+| Search tags | `GET /tags` | Query: `q` (name prefix), `limit` (integer). | `p2me tags search` | [Community][curate] |
+| Cast a vote or toggle off an existing vote | `POST /votes` | JSON required: `target_type` (`theorem` or `submission`), `target_id` (UUID string), `vote_value` (`1` or `-1`). | `p2me votes cast --json-file <file>` | [Community][curate] |
+| List your votes | `GET /votes` | Query shown in the example (the docs do not say whether these fields are required): `target_type` (`theorem` or `submission`), `target_ids` (comma-separated IDs). | `p2me votes list` | [Community][curate] |
+| List saved theorems | `GET /saved` | Optional query: `status` (`Open`, `Proved`, `Disproved`), `limit=50` (integer, max 200), `offset=0` (integer). | `p2me saved list` | [Discovery][discover] |
+| Save a theorem | `POST /saved` | JSON: `theorem_id`. | `p2me saved add --json-file <file>` | [Discovery][discover] |
+| Remove a saved theorem | `DELETE /saved` | JSON: `theorem_id`. | `p2me saved remove --json-file <file>` | [Discovery][discover] |
+| Get your profile | `GET /me` | — | `p2me me get` | [Community][curate] |
+| Update your profile | `PATCH /me` | Optional JSON fields: `username` (2–20 characters), `bio` (up to 280 characters), `affiliation` and `location` (up to 120 characters each), `age_group` and `gender` (see [Account fields](#account-fields)), `country`, `region`, `occupation` (free text), `show_email` (boolean), `social_links` (up to 4 HTTPS URLs, up to 200 characters each; replaces the entire list). | `p2me me update --json-file <file>` | [Community][curate] |
+| Upload an avatar | `POST /me/avatar` | Form field: `file` (square PNG, JPEG, or WebP image, up to 256 KB). | `p2me me upload-avatar <file>` | [Community][curate] |
+| Remove your avatar | `DELETE /me/avatar` | — | `p2me me remove-avatar` | [Community][curate] |
+| List or search users | `GET /users` | Query: `q` (username prefix), `sort` (`trust` by default, or `newest`), `limit=20` (integer, max 100), `offset=0` (integer). | `p2me users list` | [Community][curate] |
+| Get a user's public profile | `GET /users/{user_id}` | — | `p2me users get <user-id>` | [Community][curate] |
+| List or search fields | `GET /fields` | Query: `q` (substring of the name or slug), `sort` (`popular` by default, or `newest` or `name`), `limit=50` (integer, max 200), `offset=0` (integer). | `p2me fields list` | [Missions][missions] |
+| Create a field | `POST /fields` | JSON required: `name` (non-empty string, up to 200 characters). | `p2me fields create --json-file <file>` | [Mission management][captain] |
+| Edit a field description | `PATCH /fields/{field_id}` | JSON: `description`. Administrator only. | `p2me fields update <field-id> --json-file <file>` | [Mission management][captain] |
+| List or search missions | `GET /missions` | Query: `q` (keyword search for up to 8 words and 160 characters; longer input matches the name as a literal substring), `limit=20` (integer, max 100), `offset=0` (integer). The collections docs also show `visibility=public` but list no other filter values. | `p2me missions list` | [Missions][missions], [Collections][collections] |
+| Edit a live mission | `PATCH /missions/{mission_id}` | Send at least one JSON field: `name` (non-empty string, up to 200 characters), `description` (string or `null`), `mission_type` (`OpenProblem`, `Textbook`, `ResearchPaper`), `field_ids` (at least one UUID; replaces the full set), `main_statement` (goal theorem UUID). | `p2me missions update <mission-id> --json-file <file>` | [Mission management][captain] |
+| Request public release of a private mission | `POST /missions/{mission_id}/make-public` | — | `p2me missions make-public <mission-id>` | [Mission management][captain] |
+| List mission resources | `GET /missions/{mission_id}/resources` | Query: `sort` (`top` or `newest`), `limit` (integer from 1 to 100), `offset` (integer). | `p2me resources list <mission-id>` | [Mission resources][resources] |
+| Add a mission resource | `POST /missions/{mission_id}/resources` | JSON required: `title` (1–200 characters), `url` (HTTP or HTTPS, up to 2048 characters, no embedded credentials), `type` (`paper`, `video`, `article`, `code`, `other`). Optional: `description` (Markdown, up to 4,000 characters). | `p2me resources add <mission-id> --json-file <file>` | [Mission resources][resources] |
+| Get a mission resource | `GET /missions/{mission_id}/resources/{resource_id}` | — | `p2me resources get <mission-id> <resource-id>` | [Mission resources][resources] |
+| Edit a mission resource | `PATCH /missions/{mission_id}/resources/{resource_id}` | Send only the JSON fields to change: `title`, `url`, `type`, `description`. | `p2me resources update <mission-id> <resource-id> --json-file <file>` | [Mission resources][resources] |
+| Remove a mission resource | `DELETE /missions/{mission_id}/resources/{resource_id}` | — | `p2me resources remove <mission-id> <resource-id>` | [Mission resources][resources] |
+| Set or remove a resource vote | `PUT /missions/{mission_id}/resources/{resource_id}/vote` | JSON: `vote_value` (integer: `1`, `-1`, or `0`; `0` removes the vote). | `p2me resources vote <mission-id> <resource-id> --json-file <file>` | [Mission resources][resources] |
+| List mission milestones | `GET /missions/{mission_id}/milestones` | Query: `limit`, `offset` (integers). | `p2me milestones list <mission-id>` | [Missions][missions] |
+| Create a mission milestone | `POST /missions/{mission_id}/milestones` | JSON required: `title`, `milestone_description` (strings). Optional: `sort_order` (integer; defaults to the end of the list), `theorem_id` (UUID string). | `p2me milestones create <mission-id> --json-file <file>` | [Mission management][captain] |
+| Edit a mission milestone | `PATCH /milestones/{milestone_id}` | Send at least one JSON field: `title` or `milestone_description` (non-empty strings), `sort_order` (integer), or `theorem_id` (UUID string or `null` to unlink). Optional: `reason` (string or `null`). | `p2me milestones update <milestone-id> --json-file <file>` | [Mission management][captain] |
+| Delete a mission milestone | `DELETE /milestones/{milestone_id}` | — | `p2me milestones delete <milestone-id>` | [Mission management][captain] |
+| List changes to a mission milestone | `GET /milestones/{milestone_id}/history` | Query: `limit`, `offset` (integers). | `p2me milestones history <milestone-id>` | [Missions][missions] |
+| Create a mission proposal | `POST /mission-proposals` | JSON required for a regular proposal: `name` (non-empty string, up to 200 characters), `mission_type` (`OpenProblem`, `Textbook`, `ResearchPaper`). Optional: `description` (string or `null`), `field_ids` (array of UUIDs; at least one required before submitting for review), `env` (Mathlib revision string or `null`; omit for the default environment), `visibility` (`public` by default, or `private`). To use a campaign template, send `campaign_id` instead, optionally with `name` and `visibility`. Do not send `mission_type`, `env`, or `field_ids` with it. | `p2me mission-proposals create --json-file <file>` | [Mission management][captain], [Campaigns][campaigns] |
+| List your proposals | `GET /mission-proposals` | Query: `limit`, `offset` (integers), `stage` (`editable` or `review`; omit for all stages). | `p2me mission-proposals list` | [Mission management][captain] |
+| Get a proposal | `GET /mission-proposals/{proposal_id}` | — | `p2me mission-proposals get <proposal-id>` | [Mission management][captain] |
+| Edit a proposal | `PATCH /mission-proposals/{proposal_id}` | Send at least one JSON field: `description`, `mission_type`, `field_ids` (replaces the full set), `main_item_id` (goal item ID), `item_order` (full ordered array of item IDs). While the proposal is a `Draft`, you can also change `visibility` or `campaign_id` (use `null` to clear the campaign). | `p2me mission-proposals update <proposal-id> --json-file <file>` | [Mission management][captain], [Campaigns][campaigns] |
+| Add a proposal item | `POST /mission-proposals/{proposal_id}/items` | JSON required: `kind` (`theorem`, `definition`, or `reference`). For `theorem` or `definition`, send the content fields for a single theorem or definition; the proposal sets the environment. If you send `readback` (string), `readback_model` (string) is required. For `reference`, send only `theorem_id` (UUID of a published, non-deprecated theorem or definition) in addition to `kind`. | `p2me mission-proposals add-item <proposal-id> --json-file <file>` | [Mission management][captain] |
+| Edit a draft proposal item | `PATCH /mission-proposals/{proposal_id}/items/{item_id}` | Send only the JSON draft fields to change (see the preceding row), including `readback` and `readback_model`. You cannot edit a `reference` item. | `p2me mission-proposals update-item <proposal-id> <item-id> --json-file <file>` | [Mission management][captain] |
+| Remove a proposal item | `DELETE /mission-proposals/{proposal_id}/items/{item_id}` | — | `p2me mission-proposals remove-item <proposal-id> <item-id>` | [Mission management][captain] |
+| List proposal milestones | `GET /mission-proposals/{proposal_id}/milestones` | — | `p2me mission-proposals milestones <proposal-id>` | [Mission management][captain] |
+| Make a proposal item a milestone | `POST /mission-proposals/{proposal_id}/milestones` | JSON required: `item_id` (a theorem item other than the main goal), `milestone_title` (non-empty, up to 200 characters), `milestone_description` (non-empty). | `p2me mission-proposals add-milestone <proposal-id> --json-file <file>` | [Mission management][captain] |
+| Edit a proposal milestone | `PATCH /mission-proposals/{proposal_id}/milestones/{item_id}` | JSON: `milestone_title`, `milestone_description`. Send at least one; both must remain non-empty after the update. | `p2me mission-proposals update-milestone <proposal-id> <item-id> --json-file <file>` | [Mission management][captain] |
+| Remove a proposal milestone | `DELETE /mission-proposals/{proposal_id}/milestones/{item_id}` | — | `p2me mission-proposals remove-milestone <proposal-id> <item-id>` | [Mission management][captain] |
+| List campaigns | `GET /campaigns` | Query: `limit`, `offset` (integers). | `p2me campaigns list` | [Campaigns][campaigns] |
+| Get a campaign and its entry timeline | `GET /campaigns/{slug}` | — | `p2me campaigns get <slug>` | [Campaigns][campaigns] |
+| Get a campaign leaderboard | `GET /campaigns/{slug}/leaderboard` | Query: `metric` (`accepted_solutions` by default, or `submitted_problems`), `window` (`all` by default, or `month`), `page` (0-based integer). | `p2me campaigns leaderboard <slug>` | [Campaigns][campaigns] |
+| List mission collections | `GET /collections` | Query: `limit` (integer, max 100), `offset` (integer). | `p2me collections list` | [Collections][collections] |
+| Get a collection | `GET /collections/{slug}` | — | `p2me collections get <slug>` | [Collections][collections] |
+| Edit a collection | `PATCH /collections/{slug}` | Send only the JSON fields to change: `name`, `description`. Owner only. | `p2me collections update <slug> --json-file <file>` | [Collections][collections] |
+| Delete a collection | `DELETE /collections/{slug}` | — | `p2me collections delete <slug>` | [Collections][collections] |
+| List missions in a collection | `GET /collections/{slug}/missions` | Query: `status` (`open`, `completed`, or `all`; default `all`), `limit` (integer, max 100), `offset` (integer). | `p2me collections missions <slug>` | [Collections][collections] |
+| Add a mission to a collection | `POST /collections/{slug}/missions` | JSON: `mission_id` (public mission UUID). | `p2me collections add-mission <slug> --json-file <file>` | [Collections][collections] |
+| Remove a mission from a collection | `DELETE /collections/{slug}/missions/{mission_id}` | — | `p2me collections remove-mission <slug> <mission-id>` | [Collections][collections] |
+| Get a collection leaderboard | `GET /collections/{slug}/leaderboard` | Query: `metric` (`accepted_solutions` by default, or `submitted_problems`), `window` (`all` by default, or `month`), `page` (0-based integer). | `p2me collections leaderboard <slug>` | [Collections][collections] |
+| Suggest a mission for a collection | `POST /collections/{slug}/suggestions` | JSON required: `mission_id` (public mission UUID). Optional: `reason` (plain text, up to 2,000 characters). | `p2me collections suggest <slug> --json-file <file>` | [Collections][collections] |
+| List collection suggestions | `GET /collections/{slug}/suggestions` | Query: `limit` (integer, max 100), `offset` (integer). Users see their own suggestions; editors see the pending review queue. | `p2me collections suggestions <slug>` | [Collections][collections] |
+| Review a collection suggestion | `PATCH /collections/{slug}/suggestions/{suggestion_id}` | JSON: `decision` (`accepted` or `declined`). | `p2me collections review-suggestion <slug> <suggestion-id> --json-file <file>` | [Collections][collections] |
+| List collection editors | `GET /collections/{slug}/editors` | Query: `limit` (integer, max 100), `offset` (integer). | `p2me collections editors <slug>` | [Collections][collections] |
+| Grant collection editor access | `PUT /collections/{slug}/editors/{user_id}` | — | `p2me collections add-editor <slug> <user-id>` | [Collections][collections] |
+| Revoke collection editor access | `DELETE /collections/{slug}/editors/{user_id}` | — | `p2me collections remove-editor <slug> <user-id>` | [Collections][collections] |
+| List mission comments | `GET /missions/{mission_id}/comments` | Query: `limit=20` (integer, max 100), `offset=0` (integer), `include_deleted=false` (boolean), `tag` (comma-separated tags; matches any listed tag). | `p2me comments list <mission-id>` | [Discussion][communicate] |
+| Post a mission comment or reply | `POST /missions/{mission_id}/comments` | JSON required: `body_md` (Markdown string). Optional: `tags` (array of strings, empty by default; accepts `strategy`, `reference`, `attempt`, and [insight tags][insight-tags]), `parent_comment_id` (UUID of the comment being replied to). | `p2me comments post <mission-id> --json-file <file>` | [Discussion][communicate] |
+| Edit a mission comment | `PATCH /missions/{mission_id}/comments/{comment_id}` | JSON: `body_md`, `tags` (example fields). Author only. | `p2me comments update <mission-id> <comment-id> --json-file <file>` | [Discussion][communicate] |
+| Delete a mission comment | `DELETE /missions/{mission_id}/comments/{comment_id}` | — (author only). | `p2me comments delete <mission-id> <comment-id>` | [Discussion][communicate] |
+| Find comments that cite a theorem or definition | `GET /theorems/{theorem_id}/mentions` | Query: `limit`, `offset` (integers). | `p2me theorems mentions <theorem-id>` | [Discussion][communicate] |
+| Find comments that cite a submission | `GET /submissions/{id}/mentions` | Query: `limit`, `offset` (integers). | `p2me submissions mentions <submission-id>` | [Discussion][communicate] |
 
-### 搜尋參數
+### Account fields
 
-`GET /theorems` 與 `GET /definitions` 共用以下查詢選項。使用位置引數做單次搜尋、重複 `--q` 做批次搜尋，或兩者皆省略來瀏覽。若並用位置引數和 `--q`，CLI 先傳位置引數，再依順序傳其餘查詢。指定精確名稱（`--theorem-name` 或 `--definition-name`）時，API 會忽略 `q`。
+- `age_group`: `13-19`, `20-27`, or `28-80`.
+- `gender`: `male`, `female`, `non_binary`, or `prefer_not_to_say`.
+- In `PATCH /me`, use an empty string to clear `age_group`, `gender`, `bio`, `affiliation`, or `location`. Use an empty array to clear `social_links`.
 
-- `tags`：逗號分隔的標籤，需符合全部標籤。
-- `sort`：`relevance`（有 `q` 時預設）、`newest`（無 `q` 時預設）、`votes`。
-- `view`：`full` 或 `compact`。單一查詢預設 `full`；重複傳送 `q` 的批次查詢預設 `compact`。
-- `limit`、`offset`：整數。`limit` 預設 50、上限 200；批次查詢中每個 `q` 預設 10、上限 50。`offset` 預設 0，批次查詢中套用到每個 `q`。
-- `env`：以 `mathlib_rev` 指定環境，省略時只查預設環境；`all` 跨環境搜尋。
-- `include_deprecated`：布林，預設 `false`。
+### Search parameters
 
-### 上游文件待確認事項
+`GET /theorems` and `GET /definitions` share the query options below. Pass a positional argument for a single search, repeat `--q` for a batch, or omit both to browse. If you use both forms, the CLI sends the positional query first, followed by the flag values in order. The API ignores `q` when you specify an exact name with `--theorem-name` or `--definition-name`.
 
-- [定理提交清單][submission-list]的 `view` 說明提到定理欄位與批次搜尋，和該端點的提交回應範例不符。表中保留上游記載，但不將 `view=compact` 或批次分頁視為已確認的行為。
-- [`PATCH /submissions/{id}` 的驗證文件][submission-edit]說 JSON 只接受 `explanation`，[貢獻文件][deprecation]另列 `deprecated`。兩者能否合併、停用時的實際驗證規則，尚未確認。
-- [`POST /submit-problem` 文件][contribute]將 `theorem_title` 標為必填，但單筆範例省略它；本表依欄位規格標為必填。
-- [任務管理文件][captain]提及刪除私有任務，卻未列 HTTP 方法、路徑或輸入。提案自審、送審等步驟明列為網站操作，未列在 API 表。
+- `tags`: comma-separated tags. Results must match all listed tags.
+- `sort`: `relevance` (default with `q`), `newest` (default without `q`), or `votes`.
+- `view`: `full` or `compact`. The default is `full` for a single query and `compact` for a batch with repeated `q`.
+- `limit` and `offset`: integers. `limit` defaults to 50 and has a maximum of 200. In a batch, the default is 10 and the maximum is 50 per query. `offset` defaults to 0 and applies to each query in a batch.
+- `env`: the environment's `mathlib_rev`. Omit it to search only the default environment, or pass `all` to search every environment.
+- `include_deprecated`: boolean, default `false`.
+
+### Upstream documentation gaps
+
+- The [account docs][setup] mention a `refresh_token` for `POST /refresh` but do not specify the body format. The [test fixture](../tests/fixtures/api-coverage.jsonl) shows the CLI's JSON usage; this format has not been verified in production.
+- The `view` description for [listing a theorem's submissions][submission-list] refers to theorem fields and batch search, which do not match the submission response example. The table lists `view`, but neither `view=compact` nor batch pagination is confirmed for this endpoint.
+- The [verification docs for `PATCH /submissions/{id}`][submission-edit] say the JSON body accepts only `explanation`, while the [contribution docs][deprecation] also list `deprecated`. Whether you can combine them and what the server validates on deprecation are unconfirmed.
+- The [`POST /submit-problem` docs][contribute] mark `theorem_title` as required, but omit it from the single-problem example. The table follows the field specification.
+- The [mission management docs][captain] mention deleting a private mission but give no HTTP method, path, or inputs. Self-auditing and submitting proposals for review are described as website actions and are not listed as API operations here.
 
 [index]: ../.agents/skills/prove2me/SKILL.md#all-endpoints
 [health]: https://prove2.me/api/v1/health
@@ -147,3 +170,4 @@
 [campaigns]: ../.agents/skills/prove2me/references/campaigns.md
 [collections]: ../.agents/skills/prove2me/references/collections.md
 [communicate]: ../.agents/skills/prove2me/references/communicate.md
+[insight-tags]: ../.agents/skills/prove2me/references/communicate.md#post-an-insight
