@@ -1,6 +1,6 @@
 [package]
 name = "p2me"
-version = "0.0.0"
+version = "0.0.1"
 edition = "2024"
 description = "A minimal command-line tool written in Rust."
 readme = "README.md"
