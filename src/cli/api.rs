@@ -1,7 +1,12 @@
-use std::{io::ErrorKind, path::Path, time::Duration};
+use std::{
+    fs::File,
+    io::{ErrorKind, Read, Seek},
+    path::Path,
+    time::Duration,
+};
 
 use reqwest::{
-    Url,
+    Method, StatusCode, Url,
     blocking::{
         Client, RequestBuilder,
         multipart::{Form, Part},
@@ -36,83 +41,101 @@ impl Api {
         Ok(Self { base, client })
     }
 
-    fn endpoint(&self, segments: &[&str]) -> Url {
+    pub fn request(&self, method: Method, segments: &[&str]) -> RequestBuilder {
         let mut url = self.base.clone();
         url.path_segments_mut()
             .expect("the configured API base URL supports path segments")
             .pop_if_empty()
             .extend(segments);
-        url
+        self.client.request(method, url)
     }
 
-    pub fn search(&self, query: &str) -> RequestBuilder {
-        self.client
-            .get(self.endpoint(&["theorems"]))
-            .query(&[("q", query)])
-    }
-
-    pub fn theorem(&self, id: &str) -> Result<RequestBuilder, &'static str> {
-        if !id
-            .bytes()
-            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_'))
-        {
-            return Err("invalid theorem ID");
-        }
-        Ok(self.client.get(self.endpoint(&["theorems", id])))
-    }
-
-    pub fn submit(
+    pub fn send_authenticated(
         &self,
-        theorem_id: String,
-        path: &Path,
-        proof_type: &'static str,
-        explanation: Option<String>,
-    ) -> Result<RequestBuilder, &'static str> {
-        let name = path
-            .file_name()
-            .ok_or("missing Lean file name")?
-            .to_string_lossy()
-            .into_owned();
-        let (file, metadata) = input_file::open(path).map_err(|error| match error.kind() {
-            ErrorKind::InvalidInput => "the Lean file must be a regular file",
-            _ => "could not open the Lean file",
-        })?;
-        let mut form = Form::new()
-            .text("theorem_id", theorem_id)
-            .text("proof_type", proof_type)
-            .part(
-                "file",
-                Part::reader_with_length(file, metadata.len()).file_name(name),
-            );
-        if let Some(explanation) = explanation {
-            form = form.text("explanation", explanation);
-        }
-        Ok(self.client.post(self.endpoint(&["verify"])).multipart(form))
-    }
-
-    pub fn status(&self, id: &str) -> RequestBuilder {
-        self.client
-            .get(self.endpoint(&["verify"]))
-            .query(&[("submission_id", id)])
-    }
-
-    pub fn send(&self, request: RequestBuilder, key: &str) -> Result<Value, String> {
-        let auth = send_json(
-            self.client
-                .post(self.endpoint(&["agent", "refresh"]))
-                .json(&json!({ "api_key": key })),
-            "authentication",
-        )?;
+        request: RequestBuilder,
+        key: &str,
+    ) -> Result<Option<Value>, String> {
+        let auth = exchange_key(self.request(Method::POST, &["agent", "refresh"]), key)?;
         let token = auth
-            .get("access_token")
-            .and_then(Value::as_str)
-            .filter(|token| !token.is_empty())
+            .as_ref()
+            .and_then(access_token)
             .ok_or("Prove2me authentication did not return an access token")?;
         send_json(request.bearer_auth(token), "request")
     }
 }
 
-fn send_json(request: RequestBuilder, operation: &str) -> Result<Value, String> {
+pub fn exchange_key(request: RequestBuilder, key: &str) -> Result<Option<Value>, String> {
+    send_json(request.json(&json!({ "api_key": key })), "authentication")
+}
+
+pub fn access_token(value: &Value) -> Option<&str> {
+    value
+        .get("access_token")
+        .and_then(Value::as_str)
+        .filter(|token| !token.trim().is_empty())
+}
+
+pub fn proof_form(
+    theorem_id: &str,
+    path: &Path,
+    proof_type: &str,
+    explanation: Option<&str>,
+) -> Result<Form, &'static str> {
+    let (file, length, name) = open_upload(path).map_err(|error| match error.kind() {
+        ErrorKind::InvalidInput => "the Lean file must be a regular file",
+        _ => "could not open the Lean file",
+    })?;
+    let mut form = Form::new()
+        .text("theorem_id", theorem_id.to_owned())
+        .text("proof_type", proof_type.to_owned())
+        .part(
+            "file",
+            Part::reader_with_length(file, length).file_name(name),
+        );
+    if let Some(explanation) = explanation {
+        form = form.text("explanation", explanation.to_owned());
+    }
+    Ok(form)
+}
+
+pub fn avatar_form(path: &Path) -> Result<Form, &'static str> {
+    let (mut file, length, name) = open_upload(path).map_err(|error| match error.kind() {
+        ErrorKind::InvalidInput => "the avatar must be a regular file",
+        _ => "could not open the avatar file",
+    })?;
+    let mut prefix = [0; 12];
+    let prefix = &mut prefix[..length.min(12) as usize];
+    file.read_exact(prefix)
+        .map_err(|_| "could not read the avatar file")?;
+    let mime = if prefix.starts_with(b"\x89PNG\r\n\x1a\n") {
+        "image/png"
+    } else if prefix.starts_with(b"\xff\xd8\xff") {
+        "image/jpeg"
+    } else if prefix.starts_with(b"RIFF") && prefix.get(8..12) == Some(b"WEBP") {
+        "image/webp"
+    } else {
+        return Err("the avatar must be a PNG, JPEG, or WebP image");
+    };
+    file.rewind()
+        .map_err(|_| "could not read the avatar file")?;
+    let part = Part::reader_with_length(file, length)
+        .file_name(name)
+        .mime_str(mime)
+        .expect("a static image MIME type is valid");
+    Ok(Form::new().part("file", part))
+}
+
+fn open_upload(path: &Path) -> std::io::Result<(File, u64, String)> {
+    let (file, metadata) = input_file::open(path)?;
+    let name = path
+        .file_name()
+        .ok_or(ErrorKind::InvalidInput)?
+        .to_string_lossy()
+        .into_owned();
+    Ok((file, metadata.len(), name))
+}
+
+pub fn send_json(request: RequestBuilder, operation: &str) -> Result<Option<Value>, String> {
     let response = request.send().map_err(|error| {
         if error.is_timeout() {
             format!("Prove2me {operation} timed out")
@@ -127,7 +150,11 @@ fn send_json(request: RequestBuilder, operation: &str) -> Result<Value, String> 
             status.as_u16()
         ));
     }
+    if status == StatusCode::NO_CONTENT {
+        return Ok(None);
+    }
     response
         .json()
+        .map(Some)
         .map_err(|_| format!("could not read the Prove2me {operation} response as JSON"))
 }

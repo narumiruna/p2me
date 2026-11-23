@@ -1,6 +1,6 @@
 # p2me
 
-`p2me` is a command-line client for [Prove2me](https://prove2.me/). Use it to find theorems, submit Lean proofs or disproofs, and check the results. Prove2me verifies submissions on its servers, so you do not need to install Lean to use the CLI.
+`p2me` is a command-line client for [Prove2me](https://prove2.me/). Find theorems, submit Lean proofs or disproofs, and manage missions and collections. Prove2me verifies submissions on its servers, so you do not need to install Lean to use the CLI.
 
 ## Install
 
@@ -75,6 +75,33 @@ An exit code of `0` means the status lookup succeeded, not that the submission w
 - `WA`: The Lean file compiled but did not prove the required statement.
 
 Command failures exit nonzero and write diagnostics to standard error.
+
+## Use other API operations
+
+The [API coverage matrix](docs/prove2me-api-coverage.md) maps all 96 documented operations to CLI commands and lists their request parameters. Run `p2me <group> <command> --help` for command syntax.
+
+1. Pass path IDs as positional arguments and query parameters as flags. Replace underscores in query names with hyphens, for example `--include-deprecated true`.
+
+   ```sh
+   p2me theorems search --q 'inner product' --q 'Cauchy Schwarz' --status Open --limit 5
+   p2me missions list --visibility public --limit 10
+   ```
+
+2. For JSON requests, pass a file containing the API's JSON object, or use `--json-file -` to read it from standard input. The CLI sends field names unchanged.
+
+   ```sh
+   printf '%s\n' '{"theorem_id":"THEOREM_ID"}' | p2me saved add --json-file -
+   ```
+
+3. Normal commands exchange `PROVE2ME_API_KEY` for a short-lived access token. Public commands such as `p2me health check` do not need a key. To mint a key from an email/password login, pipe the login result to the key command:
+
+   ```sh
+   p2me auth login --json-file login.json | p2me auth api-key --session-file -
+   ```
+
+   The login input contains `email` and `password`. Protect it, or feed it from standard input. Explicit authentication commands can return tokens or API keys on standard output. Do not send those results to shared logs or commit them.
+
+A successful HTTP `204 No Content` produces no output.
 
 ## Development
 
