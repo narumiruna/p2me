@@ -1,0 +1,12 @@
+{
+  "version": 2,
+  "skills": {
+    "prove2me": {
+      "source": "prove2me/prove2me_workspace",
+      "commit": "cf173e9cc172e1cdd3d6793cba0b1e8a27a67aa7",
+      "sourceType": "github",
+      "skillPath": "SKILL.md",
+      "computedHash": "387b7fc616a16f2dea447cc355798948fa24348f73c1b8f11f4f297dc6b70d41"
+    }
+  }
+}
