@@ -22,7 +22,7 @@ Data commands write one indented JSON result to standard output. Fields keep the
 
 ## Development
 
-GitHub Actions checks formatting, runs Clippy, and runs tests on Linux for pull requests and pushes to `main`.
+GitHub Actions checks formatting, runs Clippy, and runs tests on Linux for pull requests and pushes to `main`. Run `cargo test --locked --all-targets --features test-endpoint` to test the built CLI against a local HTTP server. The loopback override is only available in debug builds with this test feature, not in release builds.
 
 [Changenote](https://github.com/changenote/changenote) uses [`.changenote/`](.changenote/) to manage a release pull request. On pushes to `main`, it also publishes tags and GitHub Releases for verified releases. Manual runs only manage the release pull request. In the repository's Actions settings, allow GitHub Actions to create pull requests. The GitHub release workflow needs no custom secrets and does not upload packages to registries.
 
