@@ -53,6 +53,8 @@ Commands that return data write one indented JSON result to standard output. Fie
 
 A status lookup can exit `0` even when the proof has not been accepted. Check the `status` field for values such as `PENDING` or `WA`. `SKETCH_ACCEPTED` means Prove2me accepted a reduction to claims that still need proofs, not a full proof. Command failures exit nonzero and write diagnostics to standard error.
 
+See the [Prove2me API and CLI coverage matrix](docs/prove2me-api-coverage.md) for request parameters and supported commands.
+
 ## Development
 
 [CI](.github/workflows/ci.yml) checks formatting, runs Clippy, and runs tests on Linux for pull requests and pushes to `main`. To test the built CLI against a local HTTP server, run:
