@@ -23,6 +23,8 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
-      - uses: changenote/action@339f86c81883cb39f3003a38534ca87c97d1d7c2
+      - uses: changenote/action@b5a808ce21642ccc01587dc66fd34ce522b74da9 # v0.4.0
         with:
-          operation: auto
+          version: v0.15.0
+          push-git-tags: 'true'
+          create-github-releases: 'true'
