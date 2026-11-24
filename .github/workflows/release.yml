@@ -4,6 +4,11 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      pypi-tag:
+        description: Existing GitHub Release tag to publish to PyPI (leave empty to manage the release PR)
+        type: string
+        required: false
 
 permissions: {}
 
@@ -19,13 +24,80 @@ jobs:
     permissions:
       contents: write # Push the release branch and tags, and create GitHub Releases.
       pull-requests: write # Open and update the managed release pull request.
+    outputs:
+      pypi-commit: ${{ steps.backfill.outputs.commit || (steps.changenote.outputs.published == 'true' && steps.changenote.outputs.release-commit) || '' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        if: inputs.pypi-tag == ''
         with:
           persist-credentials: false
       - uses: changenote/action@b5a808ce21642ccc01587dc66fd34ce522b74da9 # v0.4.0
+        if: inputs.pypi-tag == ''
+        id: changenote
         with:
           version: v0.15.0
           github-token: ${{ secrets.PAT_TOKEN || github.token }}
           push-git-tags: 'true'
           create-github-releases: 'true'
+      - name: Resolve an existing release
+        if: inputs.pypi-tag != ''
+        id: backfill
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ inputs.pypi-tag }}
+        run: |
+          if [[ ! $TAG =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Enter a stable release tag such as v0.0.2."
+            exit 1
+          fi
+          released_tag=$(gh release view "$TAG" --json tagName,isDraft,isPrerelease \
+            --jq 'select(.isDraft == false and .isPrerelease == false) | .tagName')
+          if [[ $released_tag != "$TAG" ]]; then
+            echo "::error::The tag must have a published, stable GitHub Release."
+            exit 1
+          fi
+          commit=$(gh api "repos/$GH_REPO/commits/refs/tags/$TAG" --jq .sha)
+          echo "commit=$commit" >> "$GITHUB_OUTPUT"
+
+  build-pypi:
+    name: Build PyPI distributions
+    needs: release
+    if: needs.release.outputs.pypi-commit != ''
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read # Check out the release commit.
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ needs.release.outputs.pypi-commit }}
+          persist-credentials: false
+      - uses: PyO3/maturin-action@e83996d129638aa358a18fbd1dfb82f0b0fb5d3b # v1.51.0
+        with:
+          maturin-version: v1.16.0
+          target: x86_64-unknown-linux-gnu
+          manylinux: '2_28'
+          args: --release --locked --sdist --out dist
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: pypi-distributions
+          path: |
+            dist/*.whl
+            dist/*.tar.gz
+          if-no-files-found: error
+
+  publish-pypi:
+    name: Publish to PyPI
+    needs: build-pypi
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/project/p2me/
+    permissions:
+      id-token: write # Authenticate to PyPI with Trusted Publishing.
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: pypi-distributions
+          path: dist
+      - uses: pypa/gh-action-pypi-publish@7245906fb61fa33a13554f9d5fb856fe61758086 # v1.14.3

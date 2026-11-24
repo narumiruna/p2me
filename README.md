@@ -4,7 +4,7 @@
 
 ## Install
 
-PyPI and crates.io currently offer only `0.0.0`, a placeholder that prints `Hello, world!`. [Build from a local checkout](#development) to use the CLI now. Once a working version is published, use one of these options in order of preference:
+Version `0.0.0` on PyPI and crates.io is a placeholder that prints `Hello, world!`. If your registry only offers that version, [build from a local checkout](#development). Otherwise, use one of these options in order of preference:
 
 1. **Install with [uv](https://docs.astral.sh/uv/getting-started/installation/) (recommended).** This makes `p2me` available as a command:
 
@@ -131,18 +131,12 @@ Changenote uses the `PAT_TOKEN` Actions secret when set. Use a fine-grained pers
 
 If `PAT_TOKEN` is not set, Changenote uses the built-in `GITHUB_TOKEN`. Allow GitHub Actions to create pull requests in the repository's Actions settings. When Changenote creates or updates a release pull request with this token, the CI runs for that pull request wait for approval. A user with write access must select **Approve workflows to run** in the pull request's merge box. See [GitHub's `GITHUB_TOKEN` documentation](https://docs.github.com/en/actions/concepts/security/github_token#when-github_token-triggers-workflow-runs).
 
-On pushes to `main`, the workflow also publishes Git tags and GitHub Releases for verified releases. Manual runs only manage the release pull request. The workflow does not upload packages to registries.
+On pushes to `main`, the workflow also publishes Git tags and GitHub Releases for verified releases. When Changenote publishes a GitHub Release, the same run builds the released commit and uploads it to PyPI. The workflow does not publish to crates.io.
 
-### Build for PyPI
+### Publish to PyPI
 
-On Linux, `uv build` can produce a wheel tagged `linux_x86_64`, which PyPI rejects. Ask Maturin to check PyPI compatibility and write the files to a separate directory:
+Before publishing, create a GitHub environment called `pypi` and restrict deployments to `main`. In the [PyPI project settings](https://pypi.org/manage/project/p2me/settings/publishing/), add a [Trusted Publisher](https://docs.pypi.org/trusted-publishers/adding-a-publisher/) with owner `narumiruna`, repository `p2me`, workflow filename `release.yml`, and environment `pypi`. No PyPI API token is needed.
 
-```sh
-uv build --clear --out-dir dist/pypi --config-setting 'build-args=--compatibility pypi'
-```
+The workflow builds a Linux x86-64 wheel for glibc 2.28 or newer and a source distribution. On other platforms, installing from source requires a Rust toolchain.
 
-When ready to publish, pass only the files from `dist/pypi/` so `uv publish` does not pick up an older wheel from `dist/`:
-
-```sh
-uv publish dist/pypi/*.whl dist/pypi/*.tar.gz
-```
+To publish a version that already has a stable GitHub Release but is missing from PyPI, run the **Release** workflow from `main` and set `pypi-tag` to its tag, such as `v0.0.2`. Leave `pypi-tag` empty to manage the release pull request without uploading to PyPI.
