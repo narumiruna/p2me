@@ -127,7 +127,9 @@ The local endpoint override works only in debug builds with the `test-endpoint` 
 
 The [release workflow](.github/workflows/release.yml) pins the Changenote Action and CLI. Update both pins when a new CLI version requires a newer Action.
 
-Changenote uses the `PAT_TOKEN` Actions secret when set. If you use a fine-grained personal access token, give it write access to Contents and Pull requests for this repository. If the secret is not set, Changenote uses the built-in `GITHUB_TOKEN`; in that case, allow GitHub Actions to create pull requests in the repository's Actions settings.
+Changenote uses the `PAT_TOKEN` Actions secret when set. Use a fine-grained personal access token limited to this repository. Set **Contents** and **Pull requests** to **Read and write**.
+
+If `PAT_TOKEN` is not set, Changenote uses the built-in `GITHUB_TOKEN`. Allow GitHub Actions to create pull requests in the repository's Actions settings. When Changenote creates or updates a release pull request with this token, the CI runs for that pull request wait for approval. A user with write access must select **Approve workflows to run** in the pull request's merge box. See [GitHub's `GITHUB_TOKEN` documentation](https://docs.github.com/en/actions/concepts/security/github_token#when-github_token-triggers-workflow-runs).
 
 On pushes to `main`, the workflow also publishes Git tags and GitHub Releases for verified releases. Manual runs only manage the release pull request. The workflow does not upload packages to registries.
 
