@@ -1,3 +1,9 @@
+## 0.0.3
+
+### Patch Changes
+
+- Enable automated publication to crates.io and PyPI using Trusted Publishing.
+
 ## 0.0.2
 
 ### Patch Changes
