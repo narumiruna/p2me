@@ -26,5 +26,6 @@ jobs:
       - uses: changenote/action@b5a808ce21642ccc01587dc66fd34ce522b74da9 # v0.4.0
         with:
           version: v0.15.0
+          github-token: ${{ secrets.PAT_TOKEN || github.token }}
           push-git-tags: 'true'
           create-github-releases: 'true'

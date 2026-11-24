@@ -123,11 +123,13 @@ The local endpoint override works only in debug builds with the `test-endpoint` 
 
 ## Releases
 
-[Changenote](https://github.com/changenote/changenote) uses [`.changenote/`](.changenote/) to manage a release pull request. In the repository's Actions settings, allow GitHub Actions to create pull requests.
+[Changenote](https://github.com/changenote/changenote) uses [`.changenote/`](.changenote/) to manage a release pull request.
 
 The [release workflow](.github/workflows/release.yml) pins the Changenote Action and CLI. Update both pins when a new CLI version requires a newer Action.
 
-On pushes to `main`, the workflow also publishes Git tags and GitHub Releases for verified releases. Manual runs only manage the release pull request. The workflow does not require custom secrets or upload packages to registries.
+Changenote uses the `PAT_TOKEN` Actions secret when set. If you use a fine-grained personal access token, give it write access to Contents and Pull requests for this repository. If the secret is not set, Changenote uses the built-in `GITHUB_TOKEN`; in that case, allow GitHub Actions to create pull requests in the repository's Actions settings.
+
+On pushes to `main`, the workflow also publishes Git tags and GitHub Releases for verified releases. Manual runs only manage the release pull request. The workflow does not upload packages to registries.
 
 ### Build for PyPI
 
