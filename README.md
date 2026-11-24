@@ -131,12 +131,8 @@ Changenote uses the `PAT_TOKEN` Actions secret when set. Use a fine-grained pers
 
 If `PAT_TOKEN` is not set, Changenote uses the built-in `GITHUB_TOKEN`. Allow GitHub Actions to create pull requests in the repository's Actions settings. When Changenote creates or updates a release pull request with this token, the CI runs for that pull request wait for approval. A user with write access must select **Approve workflows to run** in the pull request's merge box. See [GitHub's `GITHUB_TOKEN` documentation](https://docs.github.com/en/actions/concepts/security/github_token#when-github_token-triggers-workflow-runs).
 
-On pushes to `main`, the workflow also publishes Git tags and GitHub Releases for verified releases. When Changenote publishes a GitHub Release, the same run builds the released commit and uploads it to PyPI. The workflow does not publish to crates.io.
+On pushes to `main`, Changenote publishes Git tags and GitHub Releases for verified releases. In the same run, `cargo publish --locked` publishes the release commit to crates.io. For PyPI, a separate job uses `uv build` to build a Linux x86-64 wheel and a source distribution from that commit. Then `uv publish` uploads both files. Manual runs only manage the release pull request; they do not upload packages.
 
-### Publish to PyPI
+[crates.io](https://crates.io/docs/trusted-publishing) and [PyPI](https://docs.pypi.org/trusted-publishers/adding-a-publisher/) both use Trusted Publishing. Their `p2me` publisher settings must match owner `narumiruna`, repository `p2me`, and workflow filename `release.yml`. Leave the optional environment field blank. The workflow requests short-lived credentials automatically; no registry token secrets are needed.
 
-Before publishing, create a GitHub environment called `pypi` and restrict deployments to `main`. In the [PyPI project settings](https://pypi.org/manage/project/p2me/settings/publishing/), add a [Trusted Publisher](https://docs.pypi.org/trusted-publishers/adding-a-publisher/) with owner `narumiruna`, repository `p2me`, workflow filename `release.yml`, and environment `pypi`. No PyPI API token is needed.
-
-The workflow builds a Linux x86-64 wheel for glibc 2.28 or newer and a source distribution. On other platforms, installing from source requires a Rust toolchain.
-
-To publish a version that already has a stable GitHub Release but is missing from PyPI, run the **Release** workflow from `main` and set `pypi-tag` to its tag, such as `v0.0.2`. Leave `pypi-tag` empty to manage the release pull request without uploading to PyPI.
+If a registry job fails before uploading, use **Re-run failed jobs** in the original release run after fixing the problem. This does not repeat a successful upload to the other registry.
